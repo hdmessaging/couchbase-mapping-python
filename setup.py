@@ -57,7 +57,7 @@ class build_doc(Command):
                 html = highlight('\n'.join(content), lexer, HtmlFormatter())
                 return [raw('', html, format='html')]
             code_block.arguments = (1, 0, 0)
-            code_block.options = {'language' : rst.directives.unchanged}
+            code_block.options = {'language': rst.directives.unchanged}
             code_block.content = 1
             rst.directives.register_directive('code-block', code_block)
         except ImportError:
@@ -78,7 +78,7 @@ class build_doc(Command):
                 old_argv = sys.argv[1:]
                 sys.argv[1:] = [
                     '--config=%s' % epydoc_conf,
-                    '--no-private', # epydoc bug, not read from config
+                    '--no-private',  # epydoc bug, not read from config
                     '--simple-term',
                     '--verbose'
                 ]
@@ -131,18 +131,17 @@ else:
 
 
 setup(
-    name = 'CouchDB',
-    version = '0.9',
-    description = 'Python library for working with CouchDB',
-    long_description = \
-"""This is a Python library for CouchDB. It provides a convenient high level
+    name='CouchDB',
+    version='0.9',
+    description='Python library for working with CouchDB',
+    long_description="""This is a Python library for CouchDB.
+It provides a convenient high level
 interface for the CouchDB server.""",
-    author = 'Christopher Lenz',
-    author_email = 'cmlenz@gmx.de',
-    license = 'BSD',
-    url = 'http://code.google.com/p/couchdb-python/',
-
-    classifiers = [
+    author='Christopher Lenz',
+    author_email='cmlenz@gmx.de',
+    license='BSD',
+    url='http://code.google.com/p/couchdb-python/',
+    classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
@@ -151,7 +150,7 @@ interface for the CouchDB server.""",
         'Topic :: Database :: Front-Ends',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
-    packages = ['couchdb', 'couchdb.tools', 'couchdb.tests'],
-    cmdclass = {'build_doc': build_doc, 'test_doc': test_doc},
+    packages=['couchdb', 'couchdb.tools', 'couchdb.tests'],
+    cmdclass={'build_doc': build_doc, 'test_doc': test_doc},
     **setuptools_options
 )
