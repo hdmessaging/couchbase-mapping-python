@@ -56,16 +56,28 @@ u'John R. Doe'
 True
 
 >>> del server['python-tests']
+
+
+Differences from couchdb.mapping
+--------------------------------
+
+* Methods that take a `Database` object in CouchDB take a `couchbase.Bucket`
+  object instead.
+* `Document#store()` method takes optional arguments `expiration` and `flags`.
+* `Document.view()` method returns a list of `Document` objects instead of a
+  `View` document.
+* `Document.query()` method is not supported.
 """
 
 import copy
+import uuid
 
 from calendar import timegm
 from datetime import date, datetime, time
 from decimal import Decimal
 from time import strptime, struct_time
 
-from couchdb.design import ViewDefinition
+from couchbase_mapping.design import ViewDefinition
 
 __all__ = ['Mapping', 'Document', 'Field', 'TextField', 'FloatField',
            'IntegerField', 'LongField', 'BooleanField', 'DecimalField',
@@ -307,14 +319,13 @@ class Document(Mapping):
                                         if k not in ('_id', '_rev')]))
 
     def _get_id(self):
-        if hasattr(self._data, 'id'):  # When data is client.Document
-            return self._data.id
         return self._data.get('_id')
 
     def _set_id(self, value):
         if self.id is not None:
             raise AttributeError('id can only be set on new documents')
         self._data['_id'] = value
+
     id = property(_get_id, _set_id, doc='The document ID')
 
     @property
@@ -323,8 +334,6 @@ class Document(Mapping):
 
         :rtype: basestring
         """
-        if hasattr(self._data, 'rev'):  # When data is client.Document
-            return self._data.rev
         return self._data.get('_rev')
 
     def items(self):
@@ -357,7 +366,7 @@ class Document(Mapping):
     def load(cls, db, id):
         """Load a specific document from the given database.
 
-        :param db: the `Database` object to retrieve the document from
+        :param db: the `Bucket` object to retrieve the document from
         :param id: the document ID
         :return: the `Document` instance, or `None` if no document with the
                  given ID was found
@@ -367,27 +376,23 @@ class Document(Mapping):
             return None
         return cls.wrap(doc)
 
-    def store(self, db):
-        """Store the document in the given database."""
-        db.save(self._data)
+    def store(self, db, expiration=0, flags=0):
+        """Store the document in the given bucket.
+
+        :param db:  the `Bucket` object to store the document in
+
+        :return: this `Document` instance
+        """
+        if self.id is not None:
+            key = self.id
+        else:
+            key = uuid.uuid4().hex
+        db.set(key, expiration, flags, self._data)
         return self
 
     @classmethod
-    def query(cls, db, map_fun, reduce_fun, language='javascript', **options):
-        """Execute a CouchDB temporary view and map the result values back to
-        objects of this mapping.
-
-        Note that by default, any properties of the document that are not
-        included in the values of the view will be treated as if they were
-        missing from the document. If you want to load the full document for
-        every row, set the ``include_docs`` option to ``True``.
-        """
-        return db.query(map_fun, reduce_fun=reduce_fun, language=language,
-                        wrapper=cls._wrap_row, **options)
-
-    @classmethod
     def view(cls, db, viewname, **options):
-        """Execute a CouchDB named view and map the result values back to
+        """Query a Couchbase view and map the result values back to
         objects of this mapping.
 
         Note that by default, any properties of the document that are not
@@ -395,7 +400,8 @@ class Document(Mapping):
         missing from the document. If you want to load the full document for
         every row, set the ``include_docs`` option to ``True``.
         """
-        return db.view(viewname, wrapper=cls._wrap_row, **options)
+        return [cls._wrap_row(row)
+                for row in db.view(viewname, wrapper=cls._wrap_row, **options)]
 
     @classmethod
     def _wrap_row(cls, row):

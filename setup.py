@@ -18,7 +18,6 @@ try:
 except ImportError:
     from distutils.core import setup
     has_setuptools = False
-import sys
 
 
 class build_doc(Command):
@@ -105,42 +104,27 @@ class test_doc(Command):
             doctest.testfile(filename, False, optionflags=doctest.ELLIPSIS)
 
 
-requirements = []
-if sys.version_info < (2, 6):
-    requirements += ['simplejson']
-
-
 # Build setuptools-specific options (if installed).
 if not has_setuptools:
     print "WARNING: setuptools/distribute not available. Console scripts will not be installed."
     setuptools_options = {}
 else:
     setuptools_options = {
-        'entry_points': {
-            'console_scripts': [
-                'couchpy = couchdb.view:main',
-                'couchdb-dump = couchdb.tools.dump:main',
-                'couchdb-load = couchdb.tools.load:main',
-                'couchdb-replicate = couchdb.tools.replicate:main',
-            ],
-        },
-        'install_requires': requirements,
+        'install_requires': ['couchbase'],
         'test_suite': 'couchdb.tests.suite',
         'zip_safe': True,
     }
 
 
 setup(
-    name='CouchDB',
-    version='0.9',
-    description='Python library for working with CouchDB',
-    long_description="""This is a Python library for CouchDB.
-It provides a convenient high level
-interface for the CouchDB server.""",
-    author='Christopher Lenz',
-    author_email='cmlenz@gmx.de',
+    name='CouchbaseMapping',
+    version='0.1.0',
+    description='Python object mapping for Couchbase',
+    long_description=open('README.txt').read(),
+    author='HDmessaging',
+    author_email='support@hdmessaging.com',
     license='BSD',
-    url='http://code.google.com/p/couchdb-python/',
+    url='https://github.com/hdmessaging/couchbase-mapping-python/',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
@@ -150,7 +134,7 @@ interface for the CouchDB server.""",
         'Topic :: Database :: Front-Ends',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
-    packages=['couchdb', 'couchdb.tools', 'couchdb.tests'],
+    packages=['couchbase_mapping', 'couchbase_mapping.tests'],
     cmdclass={'build_doc': build_doc, 'test_doc': test_doc},
     **setuptools_options
 )

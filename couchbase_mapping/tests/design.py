@@ -9,8 +9,8 @@
 import doctest
 import unittest
 
-from couchdb import design
-from couchdb.tests import testutil
+from couchbase_mapping import design
+from couchbase_mapping.tests import testutil
 
 
 class DesignTestCase(testutil.TempDatabaseMixin, unittest.TestCase):

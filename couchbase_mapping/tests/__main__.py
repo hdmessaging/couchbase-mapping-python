@@ -8,7 +8,7 @@
 
 import unittest
 
-from couchdb.tests import design, mapping
+from couchbase_mapping.tests import design, mapping
 
 
 def suite():
