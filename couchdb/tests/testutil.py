@@ -8,7 +8,7 @@
 
 import random
 import sys
-from couchdb import client
+
 
 class TempDatabaseMixin(object):
 
@@ -16,7 +16,9 @@ class TempDatabaseMixin(object):
     _db = None
 
     def setUp(self):
-        self.server = client.Server(full_commit=False)
+        # TODO: change to Couchbase
+        #self.server = client.Server(full_commit=False)
+        raise NotImplementedError
 
     def tearDown(self):
         if self.temp_dbs:

@@ -34,8 +34,6 @@ Documentation
    :numbered:
 
    getting-started.rst
-   views.rst
-   client.rst
    mapping.rst
    changes.rst
 
