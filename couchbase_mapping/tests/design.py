@@ -23,18 +23,8 @@ class DesignTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
             options=options)
         _, db = self.temp_db()
         view.sync(db)
-        design_doc = db.get('_design/foo')
+        design_doc = db['_design/foo'].ddoc
         self.assertTrue(design_doc['views']['foo']['options'] == options)
-
-    def test_retrieve_view_defn(self):
-        '''see issue 183'''
-        view_def = design.ViewDefinition('foo', 'bar', 'baz')
-        result = view_def.sync(self.db)
-        self.assertTrue(isinstance(result, list))
-        self.assertEqual(result[0][0], True)
-        self.assertEqual(result[0][1], '_design/foo')
-        doc = self.db[result[0][1]]
-        self.assertEqual(result[0][2], doc['_rev'])
 
 
 def suite():
