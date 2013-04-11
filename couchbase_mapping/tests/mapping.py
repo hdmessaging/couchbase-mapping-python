@@ -8,6 +8,7 @@
 
 from decimal import Decimal
 import doctest
+import time
 import unittest
 
 from couchbase_mapping import design, mapping
@@ -32,7 +33,7 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         assert post.id is None
         post.store(self.db)
         assert post.id is not None
-        self.assertEqual('Foo bar', self.db[post.id]['title'])
+        self.assertEqual('Foo bar', Post.load(self.db, post.id).title)
 
     def test_explicit_id_via_init(self):
         class Post(mapping.Document):
@@ -40,7 +41,7 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         post = Post(id='foo_bar', title='Foo bar')
         self.assertEqual('foo_bar', post.id)
         post.store(self.db)
-        self.assertEqual('Foo bar', self.db['foo_bar']['title'])
+        self.assertEqual('Foo bar', Post.load(self.db, 'foo_bar').title)
 
     def test_explicit_id_via_setter(self):
         class Post(mapping.Document):
@@ -49,15 +50,16 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         post.id = 'foo_bar'
         self.assertEqual('foo_bar', post.id)
         post.store(self.db)
-        self.assertEqual('Foo bar', self.db['foo_bar']['title'])
+        self.assertEqual('Foo bar', Post.load(self.db, 'foo_bar').title)
 
     def test_store_existing(self):
         class Post(mapping.Document):
             title = mapping.TextField()
         post = Post(title='Foo bar')
         post.store(self.db)
+        id = post.id
         post.store(self.db)
-        self.assertEqual(len(list(self.db.view('_all_docs'))), 1)
+        self.assertEqual(id, post.id)
 
     def test_old_datetime(self):
         dt = mapping.DateTimeField()
@@ -206,21 +208,26 @@ class WrappingTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         design.ViewDefinition.sync_many(
             self.db, [self.Item.with_include_docs,
                       self.Item.without_include_docs])
+        time.sleep(5)  # Wait for the new view to be defined and indexed.
 
     def test_viewfield_property(self):
         self.Item().store(self.db)
-        results = self.Item.with_include_docs(self.db)
-        self.assertEquals(type(results.rows[0]), self.Item)
-        results = self.Item.without_include_docs(self.db)
-        self.assertEquals(type(results.rows[0]), self.Item)
+        results = self.Item.with_include_docs(self.db, stale=False)
+        self.assertEquals(type(results[0]), self.Item)
+        results = self.Item.without_include_docs(self.db, stale=False)
+        self.assertEquals(type(results[0]), self.Item)
 
     def test_view(self):
         self.Item().store(self.db)
-        results = self.Item.view(self.db, 'test/without_include_docs')
-        self.assertEquals(type(results.rows[0]), self.Item)
-        results = self.Item.view(self.db, 'test/without_include_docs',
+        results = self.Item.view(self.db,
+                                 '_design/test/_view/without_include_docs',
+                                 stale=False)
+        self.assertEquals(type(results[0]), self.Item)
+        results = self.Item.view(self.db,
+                                 '_design/test/_view/without_include_docs',
+                                 stale=False,
                                  include_docs=True)
-        self.assertEquals(type(results.rows[0]), self.Item)
+        self.assertEquals(type(results[0]), self.Item)
 
 
 def suite():

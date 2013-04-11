@@ -27,7 +27,7 @@ To define a document mapping, you declare a Python class inherited from
 >>> person.age
 42
 
-You can then load the data from the CouchDB server through your `Document`
+You can then load the data from the Couchbase server through your `Document`
 subclass, and conveniently access all attributes:
 
 >>> person = Person.load(db, person.id)
@@ -345,8 +345,7 @@ class Document(Mapping):
         missing from the document. If you want to load the full document for
         every row, set the ``include_docs`` option to ``True``.
         """
-        return [cls._wrap_row(row)
-                for row in db.view(viewname, wrapper=cls._wrap_row, **options)]
+        return [cls._wrap_row(row) for row in db.view(viewname, **options)]
 
     @classmethod
     def _wrap_row(cls, row):
