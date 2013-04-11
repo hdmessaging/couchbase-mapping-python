@@ -51,28 +51,6 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         post.store(self.db)
         self.assertEqual('Foo bar', self.db['foo_bar']['title'])
 
-    def test_change_id_failure(self):
-        class Post(mapping.Document):
-            title = mapping.TextField()
-        post = Post(title='Foo bar')
-        post.store(self.db)
-        post = Post.load(self.db, post.id)
-        try:
-            post.id = 'foo_bar'
-            self.fail('Excepted AttributeError')
-        except AttributeError, e:
-            self.assertEqual('id can only be set on new documents', e.args[0])
-
-    def test_batch_update(self):
-        class Post(mapping.Document):
-            title = mapping.TextField()
-        post1 = Post(title='Foo bar')
-        post2 = Post(title='Foo baz')
-        results = self.db.update([post1, post2])
-        self.assertEqual(2, len(results))
-        assert results[0][0] is True
-        assert results[1][0] is True
-
     def test_store_existing(self):
         class Post(mapping.Document):
             title = mapping.TextField()
@@ -242,13 +220,6 @@ class WrappingTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         self.assertEquals(type(results.rows[0]), self.Item)
         results = self.Item.view(self.db, 'test/without_include_docs',
                                  include_docs=True)
-        self.assertEquals(type(results.rows[0]), self.Item)
-
-    def test_query(self):
-        self.Item().store(self.db)
-        results = self.Item.query(self.db, all_map_func, None)
-        self.assertEquals(type(results.rows[0]), self.Item)
-        results = self.Item.query(self.db, all_map_func, None, include_docs=True)
         self.assertEquals(type(results.rows[0]), self.Item)
 
 
