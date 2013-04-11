@@ -1,7 +1,7 @@
 Mapping CouchDB documents to Python objects: couchdb.mapping
 ============================================================
 
-.. automodule:: couchdb.mapping
+.. automodule:: couchbase_mapping.mapping
 
 Field types
 -----------
