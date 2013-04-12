@@ -4,13 +4,15 @@ Version 0.1.0 (not released)
  * Support for mapping and design modules with Couchbase.
  * Differences to the original couchdb-python library:
 
+   * Works with Couchbase instead of CouchDB.
+   * Does not include a low level API (like `couchdb.client`) but instead
+     relies on the official Couchbase Python client for that.
    * Methods that take a `Database` object in CouchDB take a `couchbase.Bucket`
      object instead.
    * `Document#store()` method takes optional arguments `expiration` and `flags`.
    * `Document.view()` method returns a list of `Document` objects instead of a
      `View` document.
    * `Document.query()` method is not supported.
-   * All views are written in JavaScript. Python view server is not supported.
    * Document revisions are not supported.
    * Methods that take a `Database` object in CouchDB take a `couchbase.Bucket`
      object instead.

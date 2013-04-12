@@ -4,8 +4,10 @@ Introduction
 ============
 
 ``couchbase_mapping`` is Python package for mapping Couchbase_ documents to
-Python objects. It makes use of the official Couchbase Python client and adds
-a higher level interface on top of it.
+Python objects. It makes use of the official `Couchbase Python client`_ and adds
+a higher level interface on top of it. ``couchbase_mapping`` is based on
+couchdb-python_ library.
+
 The package consists of the following main modules:
 
 * ``couchbase_mapping.mapping``: This module provides advanced mapping between
@@ -19,6 +21,7 @@ The source code is hosted at Github.
 .. _Couchbase: http://www.couchbase.com/
 .. _Couchbase Python client: https://github.com/couchbase/couchbase-python-client/
 .. _Github: http://code.google.com/p/couchdb-python
+.. _couchdb-python: https://code.google.com/p/couchdb-python/
 
 Documentation
 =============
