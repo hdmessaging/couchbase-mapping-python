@@ -1,7 +1,7 @@
 .PHONY: test doc upload-doc
 
 test:
-	PYTHONPATH=. python -m couchdb.tests
+	PYTHONPATH=. python -m couchbase_mapping.tests
 
 doc:
 	python setup.py build_sphinx

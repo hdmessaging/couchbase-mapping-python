@@ -9,11 +9,9 @@
 """Utility code for managing design documents."""
 
 from copy import deepcopy
-from inspect import getsource
 from itertools import groupby
 from operator import attrgetter
 from textwrap import dedent
-from types import FunctionType
 
 __all__ = ['ViewDefinition']
 __docformat__ = 'restructuredtext en'
@@ -21,15 +19,15 @@ __docformat__ = 'restructuredtext en'
 
 class ViewDefinition(object):
     r"""Definition of a view stored in a specific design document.
-    
+
     An instance of this class can be used to access the results of the view,
     as well as to keep the view definition in the design document up to date
     with the definition in the application code.
-    
-    >>> from couchdb import Server
-    >>> server = Server()
+
+    >>> from couchbase import Couchbase
+    >>> server = Couchbase('localhost', 'Administrator', 'password')
     >>> db = server.create('python-tests')
-    
+
     >>> view = ViewDefinition('tests', 'all', '''function(doc) {
     ...     emit(doc._id, null);
     ... }''')
@@ -39,51 +37,43 @@ class ViewDefinition(object):
     even exist yet. That can be fixed using the `sync` method:
 
     >>> view.sync(db)                                       #doctest: +ELLIPSIS
-    [(True, '_design/tests', ...)]
+    [{'views': {'all': {'map': '...'}}}]
     >>> design_doc = view.get_doc(db)
     >>> design_doc                                          #doctest: +ELLIPSIS
-    <Document '_design/tests'@'...' {...}>
-    >>> print design_doc['views']['all']['map']
+    <couchbase.client.DesignDoc ...>
+    >>> print design_doc.ddoc['views']['all']['map']
     function(doc) {
         emit(doc._id, null);
     }
 
-    If you use a Python view server, you can also use Python functions instead
-    of code embedded in strings:
-    
-    >>> def my_map(doc):
-    ...     yield doc['somekey'], doc['somevalue']
-    >>> view = ViewDefinition('test2', 'somename', my_map, language='python')
-    >>> view.sync(db)                                       #doctest: +ELLIPSIS
-    [(True, '_design/test2', ...)]
-    >>> design_doc = view.get_doc(db)
-    >>> design_doc                                          #doctest: +ELLIPSIS
-    <Document '_design/test2'@'...' {...}>
-    >>> print design_doc['views']['somename']['map']
-    def my_map(doc):
-        yield doc['somekey'], doc['somevalue']
-    
     Use the static `sync_many()` method to create or update a collection of
     views in the database in an atomic and efficient manner, even across
     different design documents.
 
-    >>> del server['python-tests']
+    >>> server.delete('python-tests')
+
+    Differences from couchdb.mapping
+    --------------------------------
+
+    * Methods that take a `Database` object in CouchDB take a `couchbase.Bucket`
+      object instead.
+    * All views are written in JavaScript. Python view server is not supported.
+    * `ViewDefinition#__call__()` returns a `list` instead of `ViewResults`.
+    * `ViewDefinition#get_doc()` returns a `DesignDoc` instead of `Document`.
     """
 
     def __init__(self, design, name, map_fun, reduce_fun=None,
-                 language='javascript', wrapper=None, options=None,
-                 **defaults):
+                 wrapper=None, options=None, **defaults):
         """Initialize the view definition.
-        
+
         Note that the code in `map_fun` and `reduce_fun` is automatically
         dedented, that is, any common leading whitespace is removed from each
         line.
-        
+
         :param design: the name of the design document
         :param name: the name of the view
         :param map_fun: the map function code
         :param reduce_fun: the reduce function code (optional)
-        :param language: the name of the language used
         :param wrapper: an optional callable that should be used to wrap the
                         result rows
         :param options: view specific options (e.g. {'collation':'raw'})
@@ -92,31 +82,30 @@ class ViewDefinition(object):
             design = design[8:]
         self.design = design
         self.name = name
-        if isinstance(map_fun, FunctionType):
-            map_fun = _strip_decorators(getsource(map_fun).rstrip())
         self.map_fun = dedent(map_fun.lstrip('\n'))
-        if isinstance(reduce_fun, FunctionType):
-            reduce_fun = _strip_decorators(getsource(reduce_fun).rstrip())
         if reduce_fun:
             reduce_fun = dedent(reduce_fun.lstrip('\n'))
         self.reduce_fun = reduce_fun
-        self.language = language
         self.wrapper = wrapper
         self.options = options
         self.defaults = defaults
 
     def __call__(self, db, **options):
         """Execute the view in the given database.
-        
-        :param db: the `Database` instance
+
+        :param db: the `Bucket` instance
         :param options: optional query string parameters
         :return: the view results
-        :rtype: `ViewResults`
+        :rtype: `list`
         """
         merged_options = self.defaults.copy()
         merged_options.update(options)
-        return db.view('/'.join([self.design, self.name]),
-                       wrapper=self.wrapper, **merged_options)
+        rows = db.view('/'.join(['_design', self.design, '_view', self.name]),
+                       **merged_options)
+        if self.wrapper is not None:
+            return [self.wrapper(row) for row in rows]
+        else:
+            return rows
 
     def __repr__(self):
         return '<%s %r>' % (type(self).__name__, '/'.join([
@@ -126,19 +115,24 @@ class ViewDefinition(object):
     def get_doc(self, db):
         """Retrieve and return the design document corresponding to this view
         definition from the given database.
-        
-        :param db: the `Database` instance
+
+        :param db: the `Bucket` instance
         :return: a `client.Document` instance, or `None` if the design document
                  does not exist in the database
-        :rtype: `Document`
+        :rtype: `DesignDoc`
         """
-        return db.get('_design/%s' % self.design)
+        try:
+            doc = db['_design/%s' % self.design]
+        except Exception:
+            # couchbase-python-client does not return more meaningful errors
+            doc = None
+        return doc
 
     def sync(self, db):
         """Ensure that the view stored in the database matches the view defined
         by this instance.
-        
-        :param db: the `Database` instance
+
+        :param db: the `Bucket` instance
         """
         return type(self).sync_many(db, [self])
 
@@ -147,12 +141,12 @@ class ViewDefinition(object):
         """Ensure that the views stored in the database that correspond to a
         given list of `ViewDefinition` instances match the code defined in
         those instances.
-        
+
         This function might update more than one design document. This is done
         using the CouchDB bulk update feature to ensure atomicity of the
         operation.
-        
-        :param db: the `Database` instance
+
+        :param db: the `Bucket` instance
         :param views: a sequence of `ViewDefinition` instances
         :param remove_missing: whether views found in a design document that
                                are not found in the list of `ViewDefinition`
@@ -167,9 +161,11 @@ class ViewDefinition(object):
         views = sorted(views, key=attrgetter('design'))
         for design, views in groupby(views, key=attrgetter('design')):
             doc_id = '_design/%s' % design
-            doc = db.get(doc_id, {'_id': doc_id})
+            try:
+                doc = db[doc_id]
+            except Exception:
+                doc = {}
             orig_doc = deepcopy(doc)
-            languages = set()
 
             missing = list(doc.get('views', {}).keys())
             for view in views:
@@ -179,27 +175,20 @@ class ViewDefinition(object):
                 if view.options:
                     funcs['options'] = view.options
                 doc.setdefault('views', {})[view.name] = funcs
-                languages.add(view.language)
                 if view.name in missing:
                     missing.remove(view.name)
 
             if remove_missing and missing:
                 for name in missing:
                     del doc['views'][name]
-            elif missing and 'language' in doc:
-                languages.add(doc['language'])
-
-            if len(languages) > 1:
-                raise ValueError('Found different language views in one '
-                                 'design document (%r)', list(languages))
-            doc['language'] = list(languages)[0]
 
             if doc != orig_doc:
                 if callback is not None:
                     callback(doc)
+                db[doc_id] = doc
                 docs.append(doc)
 
-        return db.update(docs)
+        return docs
 
 
 def _strip_decorators(code):

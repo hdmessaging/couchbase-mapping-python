@@ -8,7 +8,9 @@
 
 import random
 import sys
-from couchdb import client
+
+from couchbase import Couchbase
+
 
 class TempDatabaseMixin(object):
 
@@ -16,7 +18,7 @@ class TempDatabaseMixin(object):
     _db = None
 
     def setUp(self):
-        self.server = client.Server(full_commit=False)
+        self.server = Couchbase('localhost', 'Administrator', 'password')
 
     def tearDown(self):
         if self.temp_dbs:
@@ -28,7 +30,7 @@ class TempDatabaseMixin(object):
             self.temp_dbs = {}
         # Find an unused database name
         while True:
-            name = 'couchdb-python/%d' % random.randint(0, sys.maxint)
+            name = 'couchbase-mapping-python_%d' % random.randint(0, sys.maxint)
             if name not in self.temp_dbs:
                 break
         db = self.server.create(name)

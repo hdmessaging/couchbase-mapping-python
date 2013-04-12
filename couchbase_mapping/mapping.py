@@ -8,15 +8,15 @@
 
 """Mapping from raw JSON data structures to Python objects and vice versa.
 
->>> from couchdb import Server
->>> server = Server()
+>>> from couchbase import Couchbase
+>>> server = Couchbase('localhost', 'Administrator', 'password')
 >>> db = server.create('python-tests')
 
 To define a document mapping, you declare a Python class inherited from
 `Document`, and add any number of `Field` attributes:
 
 >>> from datetime import datetime
->>> from couchdb.mapping import Document, TextField, IntegerField, DateTimeField
+>>> from couchbase_mapping import Document, TextField, IntegerField, DateTimeField
 >>> class Person(Document):
 ...     name = TextField()
 ...     age = IntegerField()
@@ -27,11 +27,10 @@ To define a document mapping, you declare a Python class inherited from
 >>> person.age
 42
 
-You can then load the data from the CouchDB server through your `Document`
+You can then load the data from the Couchbase server through your `Document`
 subclass, and conveniently access all attributes:
 
 >>> person = Person.load(db, person.id)
->>> old_rev = person.rev
 >>> person.name
 u'John Doe'
 >>> person.age
@@ -52,20 +51,33 @@ updated data:
 >>> person = Person.load(db, person.id)
 >>> person.name
 u'John R. Doe'
->>> person.rev != old_rev
-True
 
->>> del server['python-tests']
+>>> server.delete('python-tests')
+
+
+Differences from couchdb.mapping
+--------------------------------
+
+* Methods that take a `Database` object in CouchDB take a `couchbase.Bucket`
+  object instead.
+* `Document#store()` method takes optional arguments `expiration` and `flags`.
+* `Document.view()` method returns a list of `Document` objects instead of a
+  `View` document.
+* `Document.query()` method is not supported.
+* All views are written in JavaScript. Python view server is not supported.
+* Document revisions are not supported.
 """
 
 import copy
+import json
+import uuid
 
 from calendar import timegm
 from datetime import date, datetime, time
 from decimal import Decimal
 from time import strptime, struct_time
 
-from couchdb.design import ViewDefinition
+from couchbase_mapping.design import ViewDefinition
 
 __all__ = ['Mapping', 'Document', 'Field', 'TextField', 'FloatField',
            'IntegerField', 'LongField', 'BooleanField', 'DecimalField',
@@ -78,7 +90,7 @@ DEFAULT = object()
 
 class Field(object):
     """Basic unit for mapping a piece of data between Python and JSON.
-    
+
     Instances of this class can be added to subclasses of `Document` to describe
     the mapping of a document.
     """
@@ -174,9 +186,10 @@ class Mapping(object):
         return type('AnonymousStruct', (cls,), d)
 
     @classmethod
-    def wrap(cls, data):
+    def wrap(cls, data, id=None):
         instance = cls()
         instance._data = data
+        instance.id = id
         return instance
 
     def _to_python(self, value):
@@ -189,7 +202,7 @@ class Mapping(object):
 class ViewField(object):
     r"""Descriptor that can be used to bind a view definition to a property of
     a `Document` class.
-    
+
     >>> class Person(Document):
     ...     name = TextField()
     ...     age = IntegerField()
@@ -199,20 +212,17 @@ class ViewField(object):
     ...         }''')
     >>> Person.by_name
     <ViewDefinition '_design/people/_view/by_name'>
-    
+
     >>> print Person.by_name.map_fun
     function(doc) {
         emit(doc.name, doc);
     }
-    
-    That property can be used as a function, which will execute the view.
-    
-    >>> from couchdb import Database
-    >>> db = Database('python-tests')
-    
-    >>> Person.by_name(db, count=3)
-    <ViewResults <PermanentView '_design/people/_view/by_name'> {'count': 3}>
-    
+
+    Now the view property can be used as a function that will execute the view.
+
+    >>> Person.by_name(db, limit=3)                              #doctest: +SKIP
+    [<Person ...>, <Person ...>, <Person ...>]
+
     The results produced by the view are automatically wrapped in the
     `Document` subclass the descriptor is bound to. In this example, it would
     return instances of the `Person` class. But please note that this requires
@@ -220,36 +230,17 @@ class ViewField(object):
     mapping defined by the containing `Document` class. Alternatively, the
     ``include_docs`` query option can be used to inline the actual documents in
     the view results, which will then be used instead of the values.
-    
-    If you use Python view functions, this class can also be used as a
-    decorator:
-    
-    >>> class Person(Document):
-    ...     name = TextField()
-    ...     age = IntegerField()
-    ...
-    ...     @ViewField.define('people')
-    ...     def by_name(doc):
-    ...         yield doc['name'], doc
-    
-    >>> Person.by_name
-    <ViewDefinition '_design/people/_view/by_name'>
-
-    >>> print Person.by_name.map_fun
-    def by_name(doc):
-        yield doc['name'], doc
     """
 
     def __init__(self, design, map_fun, reduce_fun=None, name=None,
-                 language='javascript', wrapper=DEFAULT, **defaults):
+                 wrapper=DEFAULT, **defaults):
         """Initialize the view descriptor.
-        
+
         :param design: the name of the design document
         :param map_fun: the map function code
         :param reduce_fun: the reduce function code (optional)
         :param name: the actual name of the view in the design document, if
                      it differs from the name the descriptor is assigned to
-        :param language: the name of the language used
         :param wrapper: an optional callable that should be used to wrap the
                         result rows
         :param defaults: default query string parameters to apply
@@ -258,20 +249,8 @@ class ViewField(object):
         self.name = name
         self.map_fun = map_fun
         self.reduce_fun = reduce_fun
-        self.language = language
         self.wrapper = wrapper
         self.defaults = defaults
-
-    @classmethod
-    def define(cls, design, name=None, language='python', wrapper=DEFAULT,
-               **defaults):
-        """Factory method for use as a decorator (only suitable for Python
-        view code).
-        """
-        def view_wrapped(fun):
-            return cls(design, fun, language=language, wrapper=wrapper,
-                       **defaults)
-        return view_wrapped
 
     def __get__(self, instance, cls=None):
         if self.wrapper is DEFAULT:
@@ -279,8 +258,7 @@ class ViewField(object):
         else:
             wrapper = self.wrapper
         return ViewDefinition(self.design, self.name, self.map_fun,
-                              self.reduce_fun, language=self.language,
-                              wrapper=wrapper, **self.defaults)
+                              self.reduce_fun, wrapper=wrapper, **self.defaults)
 
 
 class DocumentMeta(MappingMeta):
@@ -302,107 +280,79 @@ class Document(Mapping):
             self.id = id
 
     def __repr__(self):
-        return '<%s %r@%r %r>' % (type(self).__name__, self.id, self.rev,
-                                  dict([(k, v) for k, v in self._data.items()
-                                        if k not in ('_id', '_rev')]))
+        return '<%s %r %r>' % (type(self).__name__, self.id,
+                               dict([(k, v) for k, v in self._data.items()]))
 
-    def _get_id(self):
-        if hasattr(self._data, 'id'): # When data is client.Document
-            return self._data.id
-        return self._data.get('_id')
-    def _set_id(self, value):
-        if self.id is not None:
-            raise AttributeError('id can only be set on new documents')
-        self._data['_id'] = value
-    id = property(_get_id, _set_id, doc='The document ID')
-
-    @property
-    def rev(self):
-        """The document revision.
-        
-        :rtype: basestring
-        """
-        if hasattr(self._data, 'rev'): # When data is client.Document
-            return self._data.rev
-        return self._data.get('_rev')
+    id = None
 
     def items(self):
         """Return the fields as a list of ``(name, value)`` tuples.
-        
+
         This method is provided to enable easy conversion to native dictionary
         objects, for example to allow use of `mapping.Document` instances with
         `client.Database.update`.
-        
+
         >>> class Post(Document):
         ...     title = TextField()
         ...     author = TextField()
         >>> post = Post(id='foo-bar', title='Foo bar', author='Joe')
         >>> sorted(post.items())
         [('_id', 'foo-bar'), ('author', u'Joe'), ('title', u'Foo bar')]
-        
+
         :return: a list of ``(name, value)`` tuples
         """
         retval = []
         if self.id is not None:
             retval.append(('_id', self.id))
-            if self.rev is not None:
-                retval.append(('_rev', self.rev))
         for name, value in self._data.items():
-            if name not in ('_id', '_rev'):
+            if name != '_id':
                 retval.append((name, value))
         return retval
 
     @classmethod
     def load(cls, db, id):
         """Load a specific document from the given database.
-        
-        :param db: the `Database` object to retrieve the document from
+
+        :param db: the `Bucket` object to retrieve the document from
         :param id: the document ID
         :return: the `Document` instance, or `None` if no document with the
                  given ID was found
         """
-        doc = db.get(id)
+        _, _, doc = db.get(id)
         if doc is None:
             return None
-        return cls.wrap(doc)
+        return cls.wrap(json.loads(doc), id=id)
 
-    def store(self, db):
-        """Store the document in the given database."""
-        db.save(self._data)
+    def store(self, db, expiration=0, flags=0):
+        """Store the document in the given bucket.
+
+        :param db:  the `Bucket` object to store the document in
+
+        :return: this `Document` instance
+        """
+        if self.id is None:
+            self.id = uuid.uuid4().hex
+        db.set(self.id, expiration, flags, self._data)
         return self
 
     @classmethod
-    def query(cls, db, map_fun, reduce_fun, language='javascript', **options):
-        """Execute a CouchDB temporary view and map the result values back to
-        objects of this mapping.
-        
-        Note that by default, any properties of the document that are not
-        included in the values of the view will be treated as if they were
-        missing from the document. If you want to load the full document for
-        every row, set the ``include_docs`` option to ``True``.
-        """
-        return db.query(map_fun, reduce_fun=reduce_fun, language=language,
-                        wrapper=cls._wrap_row, **options)
-
-    @classmethod
     def view(cls, db, viewname, **options):
-        """Execute a CouchDB named view and map the result values back to
+        """Query a Couchbase view and map the result values back to
         objects of this mapping.
-        
+
         Note that by default, any properties of the document that are not
         included in the values of the view will be treated as if they were
         missing from the document. If you want to load the full document for
         every row, set the ``include_docs`` option to ``True``.
         """
-        return db.view(viewname, wrapper=cls._wrap_row, **options)
+        return [cls._wrap_row(row) for row in db.view(viewname, **options)]
 
     @classmethod
     def _wrap_row(cls, row):
         doc = row.get('doc')
         if doc is not None:
-            return cls.wrap(doc)
+            return cls.wrap(doc, id=row['id'])
         data = row['value']
-        data['_id'] = row['id']
         return cls.wrap(data)
 
 
@@ -443,7 +393,7 @@ class DecimalField(Field):
 
 class DateField(Field):
     """Mapping field for storing dates.
-    
+
     >>> field = DateField()
     >>> field._to_python('2007-04-01')
     datetime.date(2007, 4, 1)
@@ -469,7 +419,7 @@ class DateField(Field):
 
 class DateTimeField(Field):
     """Mapping field for storing date/time values.
-    
+
     >>> field = DateTimeField()
     >>> field._to_python('2007-04-01T15:30:00Z')
     datetime.datetime(2007, 4, 1, 15, 30)
@@ -482,8 +432,8 @@ class DateTimeField(Field):
     def _to_python(self, value):
         if isinstance(value, basestring):
             try:
-                value = value.split('.', 1)[0] # strip out microseconds
-                value = value.rstrip('Z') # remove timezone separator
+                value = value.split('.', 1)[0]  # strip out microseconds
+                value = value.rstrip('Z')  # remove timezone separator
                 value = datetime(*strptime(value, '%Y-%m-%dT%H:%M:%S')[:6])
             except ValueError:
                 raise ValueError('Invalid ISO date/time %r' % value)
@@ -499,7 +449,7 @@ class DateTimeField(Field):
 
 class TimeField(Field):
     """Mapping field for storing times.
-    
+
     >>> field = TimeField()
     >>> field._to_python('15:30:00')
     datetime.time(15, 30)
@@ -512,7 +462,7 @@ class TimeField(Field):
     def _to_python(self, value):
         if isinstance(value, basestring):
             try:
-                value = value.split('.', 1)[0] # strip out microseconds
+                value = value.split('.', 1)[0]  # strip out microseconds
                 value = time(*strptime(value, '%H:%M:%S')[3:6])
             except ValueError:
                 raise ValueError('Invalid ISO time %r' % value)
@@ -526,9 +476,9 @@ class TimeField(Field):
 
 class DictField(Field):
     """Field type for nested dictionaries.
-    
-    >>> from couchdb import Server
-    >>> server = Server()
+
+    >>> from couchbase import Couchbase
+    >>> server = Couchbase('localhost', 'Administrator', 'password')
     >>> db = server.create('python-tests')
 
     >>> class Post(Document):
@@ -554,9 +504,9 @@ class DictField(Field):
     >>> post.author.email
     u'john@doe.com'
     >>> post.extra
-    {'foo': 'bar'}
+    {u'foo': u'bar'}
 
-    >>> del server['python-tests']
+    >>> server.delete('python-tests')
     """
     def __init__(self, mapping=None, name=None, default=None):
         default = default or {}
@@ -580,8 +530,8 @@ class DictField(Field):
 class ListField(Field):
     """Field type for sequences of other fields.
 
-    >>> from couchdb import Server
-    >>> server = Server()
+    >>> from couchbase import Couchbase
+    >>> server = Couchbase('localhost', 'Administrator', 'password')
     >>> db = server.create('python-tests')
 
     >>> class Post(Document):
@@ -604,13 +554,13 @@ class ListField(Field):
     >>> post = Post.load(db, post.id)
     >>> comment = post.comments[0]
     >>> comment['author']
-    'myself'
+    u'myself'
     >>> comment['content']
-    'Bla bla'
-    >>> comment['time'] #doctest: +ELLIPSIS
-    '...T...Z'
+    u'Bla bla'
+    >>> comment['time']                                      #doctest: +ELLIPSIS
+    u'...T...Z'
 
-    >>> del server['python-tests']
+    >>> server.delete('python-tests')
     """
 
     def __init__(self, field, name=None, default=None):
@@ -628,7 +578,6 @@ class ListField(Field):
 
     def _to_json(self, value):
         return [self.field._to_json(item) for item in value]
-
 
     class Proxy(list):
 

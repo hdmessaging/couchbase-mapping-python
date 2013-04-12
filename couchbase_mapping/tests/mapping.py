@@ -8,10 +8,12 @@
 
 from decimal import Decimal
 import doctest
+import time
 import unittest
 
-from couchdb import design, mapping
-from couchdb.tests import testutil
+from couchbase_mapping import design, mapping
+from couchbase_mapping.tests import testutil
+
 
 class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
 
@@ -31,7 +33,7 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         assert post.id is None
         post.store(self.db)
         assert post.id is not None
-        self.assertEqual('Foo bar', self.db[post.id]['title'])
+        self.assertEqual('Foo bar', Post.load(self.db, post.id).title)
 
     def test_explicit_id_via_init(self):
         class Post(mapping.Document):
@@ -39,7 +41,7 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         post = Post(id='foo_bar', title='Foo bar')
         self.assertEqual('foo_bar', post.id)
         post.store(self.db)
-        self.assertEqual('Foo bar', self.db['foo_bar']['title'])
+        self.assertEqual('Foo bar', Post.load(self.db, 'foo_bar').title)
 
     def test_explicit_id_via_setter(self):
         class Post(mapping.Document):
@@ -48,37 +50,16 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         post.id = 'foo_bar'
         self.assertEqual('foo_bar', post.id)
         post.store(self.db)
-        self.assertEqual('Foo bar', self.db['foo_bar']['title'])
-
-    def test_change_id_failure(self):
-        class Post(mapping.Document):
-            title = mapping.TextField()
-        post = Post(title='Foo bar')
-        post.store(self.db)
-        post = Post.load(self.db, post.id)
-        try:
-            post.id = 'foo_bar'
-            self.fail('Excepted AttributeError')
-        except AttributeError, e:
-            self.assertEqual('id can only be set on new documents', e.args[0])
-
-    def test_batch_update(self):
-        class Post(mapping.Document):
-            title = mapping.TextField()
-        post1 = Post(title='Foo bar')
-        post2 = Post(title='Foo baz')
-        results = self.db.update([post1, post2])
-        self.assertEqual(2, len(results))
-        assert results[0][0] is True
-        assert results[1][0] is True
+        self.assertEqual('Foo bar', Post.load(self.db, 'foo_bar').title)
 
     def test_store_existing(self):
         class Post(mapping.Document):
             title = mapping.TextField()
         post = Post(title='Foo bar')
         post.store(self.db)
+        id = post.id
         post.store(self.db)
-        self.assertEqual(len(list(self.db.view('_all_docs'))), 1)
+        self.assertEqual(id, post.id)
 
     def test_old_datetime(self):
         dt = mapping.DateTimeField()
@@ -98,8 +79,8 @@ class ListFieldTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
             title = mapping.TextField()
             comments = mapping.ListField(mapping.DictField(
                 mapping.Mapping.build(
-                    author = mapping.TextField(),
-                    content = mapping.TextField(),
+                    author=mapping.TextField(),
+                    content=mapping.TextField(),
                 )
             ))
         post = Post(title='Foo bar')
@@ -206,7 +187,7 @@ class ListFieldTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
     def test_mutable_fields(self):
         class Thing(mapping.Document):
             numbers = mapping.ListField(mapping.DecimalField)
-        thing = Thing.wrap({'_id': 'foo', '_rev': 1}) # no numbers
+        thing = Thing.wrap({'_id': 'foo', '_rev': 1})  # no numbers
         thing.numbers.append('1.0')
         thing2 = Thing(id='thing2')
         self.assertEqual([i for i in thing2.numbers], [])
@@ -227,28 +208,26 @@ class WrappingTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         design.ViewDefinition.sync_many(
             self.db, [self.Item.with_include_docs,
                       self.Item.without_include_docs])
+        time.sleep(5)  # Wait for the new view to be defined and indexed.
 
     def test_viewfield_property(self):
         self.Item().store(self.db)
-        results = self.Item.with_include_docs(self.db)
-        self.assertEquals(type(results.rows[0]), self.Item)
-        results = self.Item.without_include_docs(self.db)
-        self.assertEquals(type(results.rows[0]), self.Item)
+        results = self.Item.with_include_docs(self.db, stale=False)
+        self.assertEquals(type(results[0]), self.Item)
+        results = self.Item.without_include_docs(self.db, stale=False)
+        self.assertEquals(type(results[0]), self.Item)
 
     def test_view(self):
         self.Item().store(self.db)
-        results = self.Item.view(self.db, 'test/without_include_docs')
-        self.assertEquals(type(results.rows[0]), self.Item)
-        results = self.Item.view(self.db, 'test/without_include_docs',
+        results = self.Item.view(self.db,
+                                 '_design/test/_view/without_include_docs',
+                                 stale=False)
+        self.assertEquals(type(results[0]), self.Item)
+        results = self.Item.view(self.db,
+                                 '_design/test/_view/without_include_docs',
+                                 stale=False,
                                  include_docs=True)
-        self.assertEquals(type(results.rows[0]), self.Item)
-
-    def test_query(self):
-        self.Item().store(self.db)
-        results = self.Item.query(self.db, all_map_func, None)
-        self.assertEquals(type(results.rows[0]), self.Item)
-        results = self.Item.query(self.db, all_map_func, None, include_docs=True)
-        self.assertEquals(type(results.rows[0]), self.Item)
+        self.assertEquals(type(results[0]), self.Item)
 
 
 def suite():

@@ -1,30 +1,24 @@
 .. -*- mode: rst; encoding: utf-8 -*-
-.. couchdb-python documentation master file, created by
-   sphinx-quickstart on Thu Apr 29 18:32:43 2010.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
 Introduction
 ============
 
-``couchdb`` is Python package for working with CouchDB_ from Python code.
-It consists of the following main modules:
+``couchbase_mapping`` is Python package for mapping Couchbase_ documents to
+Python objects. It makes use of the official Couchbase Python client and adds
+a higher level interface on top of it.
+The package consists of the following main modules:
 
-* ``couchdb.client``: This is the client library for interfacing CouchDB
-  servers. If you don't know where to start, this is likely to be what you're
-  looking for.
+* ``couchbase_mapping.mapping``: This module provides advanced mapping between
+  Couchbase JSON documents and Python objects.
 
-* ``couchdb.mapping``: This module provides advanced mapping between CouchDB
-  JSON documents and Python objects.
+* ``couchbase_mapping.design``: This module includes an abstraction for
+  Couchbase views that can be used to create and execute views.
 
-Additionally, the ``couchdb.view`` module implements a view server for
-views written in Python.
+The source code is hosted at Github.
 
-There may also be more information on the `project website`_.
-
-.. _couchdb: http://couchdb.org/
-.. _project website: http://code.google.com/p/couchdb-python
-.. _views written in Python: views
+.. _Couchbase: http://www.couchbase.com/
+.. _Couchbase Python client: https://github.com/couchbase/couchbase-python-client/
+.. _Github: http://code.google.com/p/couchdb-python
 
 Documentation
 =============
@@ -33,9 +27,6 @@ Documentation
    :maxdepth: 2
    :numbered:
 
-   getting-started.rst
-   views.rst
-   client.rst
    mapping.rst
    changes.rst
 
