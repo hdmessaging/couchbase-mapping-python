@@ -280,8 +280,7 @@ class Document(Mapping):
             self.id = id
 
     def __repr__(self):
-        return '<%s %r %r>' % (type(self).__name__, self.id,
-                               dict([(k, v) for k, v in self._data.items()]))
+        return '%s(%r, **%r)' % (type(self).__name__, self.id, self._data or {})
 
     id = None
 
