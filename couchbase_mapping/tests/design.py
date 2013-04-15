@@ -26,6 +26,24 @@ class DesignTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         design_doc = db['_design/foo'].ddoc
         self.assertTrue(design_doc['views']['foo']['options'] == options)
 
+    def test_multiple_views(self):
+        map_by_name = 'function(doc, meta) {emit(doc.name, null)}'
+        view1 = design.ViewDefinition(
+            'test_multiple_views',
+            'by_name',
+            map_by_name)
+        map_by_id = 'function(doc, meta) {emit(meta.id, null)}'
+        view2 = design.ViewDefinition(
+            'test_multiple_views',
+            'by_id',
+            map_by_id)
+        _, db = self.temp_db()
+        view1.sync(db)
+        view2.sync(db)
+        design_doc = db['_design/test_multiple_views'].ddoc
+        self.assertEqual(design_doc['views']['by_name']['map'], map_by_name)
+        self.assertEqual(design_doc['views']['by_id']['map'], map_by_id)
+
 
 def suite():
     suite = unittest.TestSuite()
