@@ -351,7 +351,7 @@ class Document(Mapping):
     def _wrap_row(cls, row):
         doc = row.get('doc')
         if doc is not None:
-            return cls.wrap(doc, id=row['id'])
+            return cls.wrap(doc.get('json'), id=row['id'])
         data = row['value']
         return cls.wrap(data)
 
