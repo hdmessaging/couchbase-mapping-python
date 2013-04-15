@@ -142,10 +142,6 @@ class ViewDefinition(object):
         given list of `ViewDefinition` instances match the code defined in
         those instances.
 
-        This function might update more than one design document. This is done
-        using the CouchDB bulk update feature to ensure atomicity of the
-        operation.
-
         :param db: the `Bucket` instance
         :param views: a sequence of `ViewDefinition` instances
         :param remove_missing: whether views found in a design document that
@@ -162,7 +158,7 @@ class ViewDefinition(object):
         for design, views in groupby(views, key=attrgetter('design')):
             doc_id = '_design/%s' % design
             try:
-                doc = db[doc_id]
+                doc = db[doc_id].ddoc
             except Exception:
                 doc = {}
             orig_doc = deepcopy(doc)
