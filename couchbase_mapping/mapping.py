@@ -23,7 +23,7 @@ To define a document mapping, you declare a Python class inherited from
 ...     added = DateTimeField(default=datetime.now)
 >>> person = Person(name='John Doe', age=42)
 >>> person.store(db) #doctest: +ELLIPSIS
-<Person ...>
+Person(...)
 >>> person.age
 42
 
@@ -43,7 +43,7 @@ method:
 
 >>> person.name = 'John R. Doe'
 >>> person.store(db)            #doctest: +ELLIPSIS
-<Person ...>
+Person(...)
 
 If you retrieve the document from the server again, you should be getting the
 updated data:
@@ -221,7 +221,7 @@ class ViewField(object):
     Now the view property can be used as a function that will execute the view.
 
     >>> Person.by_name(db, limit=3)                              #doctest: +SKIP
-    [<Person ...>, <Person ...>, <Person ...>]
+    [Person(...), Person(...), Person(...)]
 
     The results produced by the view are automatically wrapped in the
     `Document` subclass the descriptor is bound to. In this example, it would
@@ -496,7 +496,7 @@ class DictField(Field):
     ...     extra=dict(foo='bar'),
     ... )
     >>> post.store(db) #doctest: +ELLIPSIS
-    <Post ...>
+    Post(...)
     >>> post = Post.load(db, post.id)
     >>> post.author.name
     u'John Doe'
@@ -549,7 +549,7 @@ class ListField(Field):
     >>> len(post.comments)
     1
     >>> post.store(db) #doctest: +ELLIPSIS
-    <Post ...>
+    Post(...)
     >>> post = Post.load(db, post.id)
     >>> comment = post.comments[0]
     >>> comment['author']
