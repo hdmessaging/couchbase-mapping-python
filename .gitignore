@@ -1,2 +1,4 @@
 **.pyc
+*.egg
+*.egg-info
 doc/build
