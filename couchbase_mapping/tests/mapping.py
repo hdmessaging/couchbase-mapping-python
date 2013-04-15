@@ -193,12 +193,13 @@ class ListFieldTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         self.assertEqual([i for i in thing2.numbers], [])
 
 
-all_map_func = 'function(doc) { emit(doc._id, doc); }'
+all_map_func = 'function(doc) { emit(doc._id, null); }'
 
 
 class WrappingTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
 
     class Item(mapping.Document):
+        name = mapping.TextField()
         with_include_docs = mapping.ViewField('test', all_map_func,
                                               include_docs=True)
         without_include_docs = mapping.ViewField('test', all_map_func)
@@ -208,17 +209,23 @@ class WrappingTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         design.ViewDefinition.sync_many(
             self.db, [self.Item.with_include_docs,
                       self.Item.without_include_docs])
-        time.sleep(5)  # Wait for the new view to be defined and indexed.
+        time.sleep(10)  # Wait for the new view to be defined and indexed.
 
     def test_viewfield_property(self):
-        self.Item().store(self.db)
+        self.Item(id='1', name='item #1').store(self.db)
+
         results = self.Item.with_include_docs(self.db, stale=False)
         self.assertEquals(type(results[0]), self.Item)
+        item = [result for result in results if result.id == '1'][0]
+        self.assertEquals(item.name, 'item #1')
+
         results = self.Item.without_include_docs(self.db, stale=False)
         self.assertEquals(type(results[0]), self.Item)
+        item = [result for result in results if result.id == '1'][0]
+        self.assertEquals(item.name, None)
 
     def test_view(self):
-        self.Item().store(self.db)
+        self.Item(id='2', name='item #2').store(self.db)
         results = self.Item.view(self.db,
                                  '_design/test/_view/without_include_docs',
                                  stale=False)
@@ -228,6 +235,8 @@ class WrappingTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
                                  stale=False,
                                  include_docs=True)
         self.assertEquals(type(results[0]), self.Item)
+        item = [result for result in results if result.id == '2'][0]
+        self.assertEquals(item.name, 'item #2')
 
 
 def suite():
