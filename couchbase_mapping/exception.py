@@ -4,10 +4,18 @@ useful information.
 """
 
 
-class NotFoundError(Exception):
+class BasicException(Exception):
     def __init__(self, msg="", parent=None):
         self.parent_error = parent
         self.msg = msg
 
     def __str__(self):
         return self.msg
+
+
+class NotFoundError(BasicException):
+    pass
+
+
+class InvalidArgumentError(BasicException):
+    pass
