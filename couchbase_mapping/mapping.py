@@ -146,8 +146,8 @@ class Mapping(object):
     def __init__(self, **values):
         self._data = {}
         for attrname, field in self._fields.items():
-            if attrname in values:
-                setattr(self, attrname, values.pop(attrname))
+            if field.name in values:
+                setattr(self, attrname, values.pop(field.name))
             else:
                 setattr(self, attrname, getattr(self, attrname))
 
