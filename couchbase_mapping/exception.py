@@ -2,9 +2,10 @@
 Customize exception class that will display some
 useful information.
 """
+MEMCACHED_STATUS_INVALID_ARGUMENTS = 4
 
 
-class BasicException(Exception):
+class Error(Exception):
     def __init__(self, msg="", parent=None):
         self.parent_error = parent
         self.msg = msg
@@ -13,9 +14,9 @@ class BasicException(Exception):
         return self.msg
 
 
-class NotFoundError(BasicException):
+class NotFoundError(Error):
     pass
 
 
-class InvalidArgumentError(BasicException):
+class InvalidArgumentError(Error):
     pass

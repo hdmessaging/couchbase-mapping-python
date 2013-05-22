@@ -79,7 +79,7 @@ from time import strptime, struct_time
 from couchbase.exception import MemcachedError
 from couchbase.constants import MemcachedConstants
 from couchbase_mapping.design import ViewDefinition
-from exception import NotFoundError, InvalidArgumentError
+from exception import NotFoundError, InvalidArgumentError, MEMCACHED_STATUS_INVALID_ARGUMENTS
 
 __all__ = ['Mapping', 'Document', 'Field', 'TextField', 'FloatField',
            'IntegerField', 'LongField', 'BooleanField', 'DecimalField',
@@ -324,7 +324,7 @@ class Document(Mapping):
         except MemcachedError as e:
             if e.status == MemcachedConstants.ERR_NOT_FOUND:
                 raise NotFoundError('Document with id {} not found'.format(id), e)
-            elif e.status == 4:  # couldn't find the constant for this
+            elif e.status == MEMCACHED_STATUS_INVALID_ARGUMENTS:
                 raise InvalidArgumentError('{} is not valid document id'.format(repr(id)), e)
             else:
                 raise e
