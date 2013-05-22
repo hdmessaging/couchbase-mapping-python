@@ -19,7 +19,7 @@ if not has_setuptools:
     setuptools_options = {}
 else:
     setuptools_options = {
-        'install_requires': ['couchbase'],
+        'install_requires': ['couchbase==0.8.2'],
         'test_suite': 'couchdb.tests.suite',
         'zip_safe': True,
     }
