@@ -76,8 +76,10 @@ from calendar import timegm
 from datetime import date, datetime, time
 from decimal import Decimal
 from time import strptime, struct_time
-
+from couchbase.exception import MemcachedError
+from couchbase.constants import MemcachedConstants
 from couchbase_mapping.design import ViewDefinition
+from exception import NotFoundError, InvalidArgumentError, MEMCACHED_STATUS_INVALID_ARGUMENTS
 
 __all__ = ['Mapping', 'Document', 'Field', 'TextField', 'FloatField',
            'IntegerField', 'LongField', 'BooleanField', 'DecimalField',
@@ -317,7 +319,15 @@ class Document(Mapping):
         :return: the `Document` instance, or `None` if no document with the
                  given ID was found
         """
-        _, _, doc = db.get(id)
+        try:
+            _, _, doc = db.get(id)
+        except MemcachedError as e:
+            if e.status == MemcachedConstants.ERR_NOT_FOUND:
+                raise NotFoundError('Document with id {} not found'.format(id), e)
+            elif e.status == MEMCACHED_STATUS_INVALID_ARGUMENTS:
+                raise InvalidArgumentError('{} is not valid document id'.format(repr(id)), e)
+            else:
+                raise e
         if doc is None:
             return None
         return cls.wrap(json.loads(doc), id=id)
