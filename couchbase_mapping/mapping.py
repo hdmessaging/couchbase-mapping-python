@@ -414,8 +414,8 @@ class LongField(Field):
     _to_python = long
 
     def from_json(self, value):
-        if not isinstance(value, long):
-            raise TypeError("LongField can only wrap longs.")
+        if not isinstance(value, (long, int)):
+            raise TypeError("LongField can only wrap longs and ints.")
         return self._to_python(value)
 
 
@@ -423,7 +423,7 @@ class BooleanField(Field):
     """Mapping field for boolean values."""
     _to_python = bool
 
-    def validate(self, value):
+    def from_json(self, value):
         if not isinstance(value, bool):
             raise TypeError("BooleanField can only wrap bools.")
         return self._to_python(value)
@@ -575,9 +575,9 @@ class DictField(Field):
         return value.unwrap()
 
     def from_json(self, value):
+        if not isinstance(value, dict):
+            raise TypeError("DictField can only wrap dicts.")
         if self.mapping is None:
-            if not isinstance(value, dict):
-                raise TypeError("DictField can only wrap dicts.")
             return self._to_python(value)
         else:
             return self.mapping.from_json(value)

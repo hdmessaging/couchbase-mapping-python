@@ -70,6 +70,60 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         doc.get('foo')
         doc.get('foo', None)
 
+    def test_from_json_type_check(self):
+        class Test(mapping.Document):
+            t = mapping.TextField()
+        with self.assertRaises(TypeError):
+            Test.from_json({'t': 10})
+
+    def test_from_json_list_dict_type_check(self):
+        class Test(mapping.Document):
+            l = mapping.ListField(mapping.DictField(mapping.Mapping.build(name=mapping.TextField(), email=mapping.TextField())))
+        with self.assertRaises(TypeError):
+            Test.from_json({'l': ['a', 'b', 'c']})
+
+    def test_all_fields_from_json(self):
+        class Test(mapping.Document):
+            t = mapping.TextField()
+            f = mapping.FloatField()
+            i = mapping.IntegerField()
+            l = mapping.LongField()
+            b = mapping.BooleanField()
+            d = mapping.DecimalField()
+            date = mapping.DateField()
+            datetime = mapping.DateTimeField()
+            time = mapping.TimeField()
+            dict = mapping.DictField(mapping.Mapping.build(name=mapping.TextField(), email=mapping.TextField()))
+            list = mapping.ListField(mapping.TextField())
+
+        instance = Test.from_json({
+            't': 'test',
+            'f': 3.14,
+            'i': 2,
+            'l': 9999999999999999999L,
+            'b': True,
+            'd': '3.14159265358979323846',
+            'date': '2013-05-28',
+            'datetime': '2013-05-28T15:10:00Z',
+            'time': '15:10:00',
+            'dict': {'name': 'Jane Doe', 'email': 'jane@doe.com'},
+            'list': ['a', 'b', 'c'],
+        })
+
+    def test_named_fields_from_json(self):
+        class Test(mapping.Document):
+            class_ = mapping.TextField(name='class')
+            type_ = mapping.TextField(name='type')
+            id_ = mapping.TextField(name='id')
+
+        d = {
+            'class': 'test',
+            'type': 'test',
+            'id': 'test',
+        }
+        instance = Test.from_json(d)
+        self.assertEqual(instance.unwrap(), d)
+
 
 class ListFieldTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
 
