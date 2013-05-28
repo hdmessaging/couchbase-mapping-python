@@ -205,12 +205,15 @@ class Mapping(object):
         return self.unwrap()
 
     @classmethod
-    def from_json(cls, data, id=None):
+    def from_json(cls, data, id=None, silent=False):
         instance = cls()
+        data = data.copy()
         for field_name, field in instance._fields.items():
-            value = data.get(field.name)
+            value = data.pop(field.name, None)
             if value is not None:
                 setattr(instance, field_name, field.from_json(value))
+        if data and not silent:
+            raise ValueError("Extraneous field %s present" % data.keys()[0])
         instance.id = id
         return instance
 

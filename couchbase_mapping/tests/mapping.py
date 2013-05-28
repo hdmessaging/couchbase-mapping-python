@@ -100,7 +100,7 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
             dict_field = mapping.DictField(
                 mapping.Mapping.build(name=mapping.TextField(), email=mapping.TextField())
             )
-            listfield = mapping.ListField(mapping.TextField())
+            list_field = mapping.ListField(mapping.TextField())
 
         instance = Test.from_json({
             'text_field': 'test',
@@ -129,6 +129,15 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         }
         instance = Test.from_json(test_data)
         self.assertEqual(instance.unwrap(), test_data)
+
+    def test_extraneous_field_from_json(self):
+        class Test(mapping.Document):
+            text_field = mapping.TextField()
+        with self.assertRaises(ValueError):
+            Test.from_json({
+                'text_field': 'test',
+                'extra_field': 'extra',
+            })
 
 
 class ListFieldTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
