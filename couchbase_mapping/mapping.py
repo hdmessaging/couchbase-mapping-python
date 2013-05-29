@@ -583,7 +583,8 @@ class DictField(Field):
         if self.mapping is None:
             return self._to_python(value)
         else:
-            return self.mapping.from_json(value)
+            instance = self.mapping.from_json(value)
+            return instance.unwrap()
 
 
 class ListField(Field):

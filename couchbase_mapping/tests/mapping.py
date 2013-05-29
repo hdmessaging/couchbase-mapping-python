@@ -139,6 +139,22 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
                 'extra_field': 'extra',
             })
 
+    def test_store_from_json(self):
+        class Test(mapping.Document):
+            list_field = mapping.ListField(
+                mapping.DictField(
+                    mapping.Mapping.build(name=mapping.TextField(), email=mapping.TextField())
+                )
+            )
+        test_data = {
+            'list_field': [
+                {'name': 'John Doe', 'email': 'john@doe.com'},
+                {'name': 'Jane Doe', 'email': 'jane@doe.com'},
+            ]
+        }
+        instance = Test.from_json(test_data)
+        instance.store(self.db)
+
 
 class ListFieldTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
 
