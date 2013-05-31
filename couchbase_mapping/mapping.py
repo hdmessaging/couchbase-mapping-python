@@ -125,6 +125,10 @@ class Field(object):
     def _to_json(self, value):
         return self._to_python(value)
 
+    def from_json(self, value):
+        """Wraps a value and does appropriate type and value checking"""
+        return self._to_python(value)
+
 
 class MappingMeta(type):
 
@@ -199,6 +203,19 @@ class Mapping(object):
 
     def _to_json(self, value):
         return self.unwrap()
+
+    @classmethod
+    def from_json(cls, data, id=None, silent=False):
+        instance = cls()
+        data = data.copy()
+        for field_name, field in instance._fields.items():
+            value = data.pop(field.name, None)
+            if value is not None:
+                setattr(instance, field_name, field.from_json(value))
+        if data and not silent:
+            raise ValueError("Extraneous field %s present" % data.keys()[0])
+        instance.id = id
+        return instance
 
 
 class ViewField(object):
@@ -369,25 +386,50 @@ class TextField(Field):
     """Mapping field for string values."""
     _to_python = unicode
 
+    def from_json(self, value):
+        if not isinstance(value, basestring):
+            raise TypeError("TextField can only wrap strings.")
+        return self._to_python(value)
+
 
 class FloatField(Field):
     """Mapping field for float values."""
     _to_python = float
+
+    def from_json(self, value):
+        if not isinstance(value, float):
+            raise TypeError("FloatField can only wrap floats.")
+        return self._to_python(value)
 
 
 class IntegerField(Field):
     """Mapping field for integer values."""
     _to_python = int
 
+    def from_json(self, value):
+        if not isinstance(value, int):
+            raise TypeError("IntegerField can only wrap ints.")
+        return self._to_python(value)
+
 
 class LongField(Field):
     """Mapping field for long integer values."""
     _to_python = long
 
+    def from_json(self, value):
+        if not isinstance(value, (long, int)):
+            raise TypeError("LongField can only wrap longs and ints.")
+        return self._to_python(value)
+
 
 class BooleanField(Field):
     """Mapping field for boolean values."""
     _to_python = bool
+
+    def from_json(self, value):
+        if not isinstance(value, bool):
+            raise TypeError("BooleanField can only wrap bools.")
+        return self._to_python(value)
 
 
 class DecimalField(Field):
@@ -535,6 +577,15 @@ class DictField(Field):
             value = self.mapping(**value)
         return value.unwrap()
 
+    def from_json(self, value):
+        if not isinstance(value, dict):
+            raise TypeError("DictField can only wrap dicts.")
+        if self.mapping is None:
+            return self._to_python(value)
+        else:
+            instance = self.mapping.from_json(value)
+            return instance.unwrap()
+
 
 class ListField(Field):
     """Field type for sequences of other fields.
@@ -587,6 +638,12 @@ class ListField(Field):
 
     def _to_json(self, value):
         return [self.field._to_json(item) for item in value]
+
+    def from_json(self, value):
+        if not isinstance(value, list):
+            raise TypeError("ListField can only wrap lists.")
+        value = [self.field.from_json(item) for item in value]
+        return self._to_python(value)
 
     class Proxy(list):
 

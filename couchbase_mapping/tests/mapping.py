@@ -19,12 +19,12 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
 
     def test_mutable_fields(self):
         class Test(mapping.Document):
-            d = mapping.DictField()
-        a = Test()
-        b = Test()
-        a.d['x'] = True
-        self.assertTrue(a.d.get('x'))
-        self.assertFalse(b.d.get('x'))
+            dict_field = mapping.DictField()
+        foo = Test()
+        bar = Test()
+        foo.dict_field['x'] = True
+        self.assertTrue(foo.dict_field.get('x'))
+        self.assertFalse(bar.dict_field.get('x'))
 
     def test_automatic_id(self):
         class Post(mapping.Document):
@@ -69,6 +69,91 @@ class DocumentTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
         doc = mapping.Document()
         doc.get('foo')
         doc.get('foo', None)
+
+    def test_from_json_type_check(self):
+        class Test(mapping.Document):
+            textfield = mapping.TextField()
+        with self.assertRaises(TypeError):
+            Test.from_json({'textfield': 10})
+
+    def test_from_json_list_dict_type_check(self):
+        class Test(mapping.Document):
+            list_field = mapping.ListField(
+                mapping.DictField(
+                    mapping.Mapping.build(name=mapping.TextField(), email=mapping.TextField())
+                )
+            )
+        with self.assertRaises(TypeError):
+            Test.from_json({'list_field': ['a', 'b', 'c']})
+
+    def test_all_fields_from_json(self):
+        class Test(mapping.Document):
+            text_field = mapping.TextField()
+            float_field = mapping.FloatField()
+            integer_field = mapping.IntegerField()
+            long_field = mapping.LongField()
+            boolean_field = mapping.BooleanField()
+            decimal_field = mapping.DecimalField()
+            date_field = mapping.DateField()
+            datetime_field = mapping.DateTimeField()
+            time_field = mapping.TimeField()
+            dict_field = mapping.DictField(
+                mapping.Mapping.build(name=mapping.TextField(), email=mapping.TextField())
+            )
+            list_field = mapping.ListField(mapping.TextField())
+
+        instance = Test.from_json({
+            'text_field': 'test',
+            'float_field': 3.14,
+            'integer_field': 2,
+            'long_field': 9999999999999999999L,
+            'boolean_field': True,
+            'decimal_field': '3.14159265358979323846',
+            'date_field': '2013-05-28',
+            'datetime_field': '2013-05-28T15:10:00Z',
+            'time_field': '15:10:00',
+            'dict_field': {'name': 'Jane Doe', 'email': 'jane@doe.com'},
+            'list_field': ['a', 'b', 'c'],
+        })
+
+    def test_named_fields_from_json(self):
+        class Test(mapping.Document):
+            class_ = mapping.TextField(name='class')
+            type_ = mapping.TextField(name='type')
+            id_ = mapping.TextField(name='id')
+
+        test_data = {
+            'class': 'test',
+            'type': 'test',
+            'id': 'test',
+        }
+        instance = Test.from_json(test_data)
+        self.assertEqual(instance.unwrap(), test_data)
+
+    def test_extraneous_field_from_json(self):
+        class Test(mapping.Document):
+            text_field = mapping.TextField()
+        with self.assertRaises(ValueError):
+            Test.from_json({
+                'text_field': 'test',
+                'extra_field': 'extra',
+            })
+
+    def test_store_from_json(self):
+        class Test(mapping.Document):
+            list_field = mapping.ListField(
+                mapping.DictField(
+                    mapping.Mapping.build(name=mapping.TextField(), email=mapping.TextField())
+                )
+            )
+        test_data = {
+            'list_field': [
+                {'name': 'John Doe', 'email': 'john@doe.com'},
+                {'name': 'Jane Doe', 'email': 'jane@doe.com'},
+            ]
+        }
+        instance = Test.from_json(test_data)
+        instance.store(self.db)
 
 
 class ListFieldTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
