@@ -311,6 +311,18 @@ class WrappingTestCase(testutil.TempDatabaseMixin, unittest.TestCase):
                                                  stale=False)
         self.assertEquals(type(results[0]), self.Item)
 
+        def wrapper(result):
+            return {
+                'wrapped': True,
+                'result': result,
+            }
+        wrapped_result = self.Item.without_include_docs(self.db,
+                                                        connection_timeout=60000,
+                                                        stale=False,
+                                                        wrapper=wrapper)
+        self.assertTrue(wrapped_result[0]['wrapped'])
+
+
     def test_view(self):
         self.Item(id='2', name='item #2').store(self.db)
         time.sleep(10)
