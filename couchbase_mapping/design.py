@@ -90,7 +90,7 @@ class ViewDefinition(object):
         self.options = options
         self.defaults = defaults
 
-    def __call__(self, db, **options):
+    def __call__(self, db, wrapper=None, **options):
         """Execute the view in the given database.
 
         :param db: the `Bucket` instance
@@ -102,8 +102,9 @@ class ViewDefinition(object):
         merged_options.update(options)
         rows = db.view('/'.join(['_design', self.design, '_view', self.name]),
                        **merged_options)
-        if self.wrapper is not None:
-            return [self.wrapper(row) for row in rows]
+        wrapper = wrapper or self.wrapper
+        if wrapper:
+            return [wrapper(row) for row in rows]
         else:
             return rows
 
