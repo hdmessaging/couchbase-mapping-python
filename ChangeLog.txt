@@ -1,5 +1,5 @@
-Version 0.1.0 (not released)
-----------------------------
+Version 0.1.0
+-------------
 
  * Support for mapping and design modules with Couchbase.
  * Differences to the original couchdb-python library:
